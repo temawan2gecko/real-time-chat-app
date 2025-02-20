@@ -16,6 +16,7 @@ interface AuthState {
     signUp: (data: UserInSignUp) => Promise<void>,
     logOut: () => Promise<void>,
     logIn: (data: UserInLogIn) => Promise<void>,
+    updateProfile: (data: { profilePic: string }) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -75,6 +76,20 @@ export const useAuthStore = create<AuthState>((set) => ({
             toast.error("Произошла неизвестная ошибка")
         } finally {
             set({ isLoging: false })
+        }
+    },
+
+    updateProfile: async (data: { profilePic: string }) => {
+        set({ isUpdatingProfile: true });
+        try {
+            const res = await axiosInstance.put("/auth/update-profile", data);
+            set({ authUser: res.data });
+            toast.success("Фотография профиля успешно обновлена");
+        } catch (error) {
+            console.log("error in update profile:", error);
+            toast.error("Произошла неизвестная ошибка");
+        } finally {
+            set({ isUpdatingProfile: false });
         }
     }
 }))
