@@ -8,6 +8,7 @@ type UserInLogIn = Pick<User, "email" | "password">;
 
 interface AuthState {
     authUser: null | User,
+    onlineUsers: string[],
     isSigningUp: boolean,
     isCheckingAuth: boolean,
     isLoging: boolean,
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     isLoging: false,
     isUpdatingProfile: false,
     isCheckingAuth: true,
+    onlineUsers: [],
 
     checkAuth: async () => {
         try {
