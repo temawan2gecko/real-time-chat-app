@@ -2,9 +2,12 @@ import { create } from "zustand";
 import type { User } from "../types/user";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
+import { io, Socket } from "socket.io-client";
 
 type UserInSignUp = Pick<User, 'fullName' | 'email' | 'password'>
 type UserInLogIn = Pick<User, "email" | "password">;
+
+const BASE_URL: string = "http://localhost:5001"
 
 interface AuthState {
     authUser: null | User,
@@ -13,25 +16,31 @@ interface AuthState {
     isCheckingAuth: boolean,
     isLoging: boolean,
     isUpdatingProfile: boolean,
+    socket: null | Socket,
     checkAuth: () => Promise<void>,
     signUp: (data: UserInSignUp) => Promise<void>,
     logOut: () => Promise<void>,
     logIn: (data: UserInLogIn) => Promise<void>,
-    updateProfile: (data: { profilePic: string }) => Promise<void>
+    updateProfile: (data: { profilePic: string }) => Promise<void>,
+    connectSocket: () => void,
+    disconnectSocket: () => void
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
     authUser: null,
     isSigningUp: false,
     isLoging: false,
     isUpdatingProfile: false,
     isCheckingAuth: true,
     onlineUsers: [],
+    socket: null,
 
     checkAuth: async () => {
         try {
             const res = await axiosInstance.get('/auth/check');
             set({ authUser: res.data })
+
+            get().connectSocket()
         } catch {
             console.log(`Error in checkAuth`)
             set({ authUser: null })
@@ -45,6 +54,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             const res = await axiosInstance.post('/auth/signup', data)
             toast.success("Аккаунт успешно создан")
             set({ authUser: res.data })
+
+            get().connectSocket()
         } catch (error) {
             // if (error instanceof AxiosError && error.response && error.response.data) {
             //     toast.error(error.response.data.message);
@@ -62,6 +73,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             await axiosInstance.post('/auth/logout')
             set({ authUser: null })
             toast.success('Вы успешно вышли из системы')
+
+            get().disconnectSocket()
         } catch (error) {
             console.log(error)
             toast.error("Произошла неизвестная ошибка")
@@ -73,6 +86,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             const res = await axiosInstance.post('/auth/login', data)
             set({ authUser: res.data })
             toast.success('Вы успешно вошли в аккаунт')
+
+            get().connectSocket()
         } catch (error) {
             console.log(error)
             toast.error("Произошла неизвестная ошибка")
@@ -93,5 +108,27 @@ export const useAuthStore = create<AuthState>((set) => ({
         } finally {
             set({ isUpdatingProfile: false });
         }
+    },
+
+    connectSocket: () => {
+        const { authUser } = get();
+        if (!authUser || get().socket?.connected) return;
+
+
+        const socket = io(BASE_URL, {
+            query: {
+                userId: authUser._id
+            }
+        });
+        socket.connect();
+
+        set({ socket: socket });
+
+        socket.on("getOnlineUsers", (userIds: string[]) => {
+            set({ onlineUsers: userIds })
+        })
+    },
+    disconnectSocket: () => {
+        if (get().socket?.connected) get().socket?.disconnect();
     }
 }))
